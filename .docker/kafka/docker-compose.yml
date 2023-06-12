@@ -1,0 +1,170 @@
+version: '3'
+services: 
+  zookeeper-1: 
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: zookeeper-1
+    hostname: zookeeper-1 
+    ports: 
+      - "2181:2181"
+    volumes: 
+      - ./zookeeper_server_jaas.conf:/etc/kafka/secrets/zookeeper_server_jaas.conf
+    environment: 
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 2181 
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2 
+      ZOOKEEPER_LOG4J_ROOT_LOGLEVEL: "DEBUG"
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/zookeeper_server_jaas.conf
+    networks: 
+      - kafka-cluster
+  kafka-broker-1: 
+    image: confluentinc/cp-kafka:7.3.0
+    hostname: kafka-broker-1 
+    container_name: kafka-broker-1 
+    ports: 
+      - "9092:9092"
+      - "9991:9991"
+    volumes: 
+      - ./kafka_server_jaas.conf:/etc/kafka/secrets/kafka_server_jaas.conf
+    environment: 
+      KAFKA_BROKER_ID: 1
+      KAFKA_JMX_PORT: 9991
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker-1:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:SASL_PLAINTEXT
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN 
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN 
+      KAFKA_LOG4J_ROOT_LOGLEVEL: ERROR 
+      KAFKA_CONFLUENT_SUPPORT_METRICS_ENABLE: false
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: true
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+      KAFKA_SUPER_USERS: User:admin
+      KAFKA_OFFSETS_RETENTION_MINUTES: 172800
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka-broker-1:29092
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper-1:2181
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_ENABLE: false
+      KAFKA_HEAP_OPTS: ${KAFKA_BROKER_HEAP_OPTS}
+    networks: 
+      - kafka-cluster
+    depends_on: 
+      - zookeeper-1
+  kafka-broker-2: 
+    image: confluentinc/cp-kafka:7.3.0
+    hostname: kafka-broker-2
+    container_name: kafka-broker-2
+    ports: 
+      - "9093:9093"
+      - "9992:9992"
+    volumes: 
+      - ./kafka_server_jaas.conf:/etc/kafka/secrets/kafka_server_jaas.conf
+    environment: 
+      KAFKA_BROKER_ID: 2
+      KAFKA_JMX_PORT: 9992
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker-2:19093,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:SASL_PLAINTEXT
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_LOG4J_ROOT_LOGLEVEL: ERROR
+      KAFKA_CONFLUENT_SUPPORT_METRICS_ENABLE: false
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: true
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+      KAFKA_SUPER_USERS: User:admin
+      KAFKA_OFFSETS_RETENTION_MINUTES: 172800
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka-broker-2:29092
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper-1:2181
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_ENABLE: false
+      KAFKA_HEAP_OPTS: ${KAFKA_BROKER_HEAP_OPTS}
+    depends_on: 
+      - zookeeper-1
+      - kafka-broker-1
+    networks: 
+      - kafka-cluster
+  postgres:
+    image: debezium/postgres:13
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - 5435:5432
+    depends_on:
+      - zookeeper-1
+      - kafka-broker-1
+      - kafka-broker-2
+    networks:
+      - kafka-cluster
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.3.0
+    container_name: schema-registry
+    hostname: schema-registry
+    ports:
+      - 8081:8081
+    depends_on:
+      - zookeeper-1
+      - kafka-broker-1
+      - kafka-broker-2
+      - postgres
+    networks:
+      - kafka-cluster
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka-broker-1:19092"
+      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: PLAINTEXT
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: PLAIN
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: zookeeper-1:2181
+      SCHEMA_REGISTRY_LISTENERS: http://localhost:8081,http://schema-registry:8081
+  ksql-server:
+    image: confluentinc/cp-ksql-server
+    container_name: ksql-server
+    depends_on:
+      - zookeeper-1
+      - kafka-broker-1
+      - kafka-broker-2
+      - postgres
+      - schema-registry
+    networks:
+      - kafka-cluster
+    environment:
+      KSQL_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka-broker-1:19092"
+      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KSQL_KSQL_SERVICE_ID: ksql-server
+  connect:
+    image: debezium/connect
+    container_name: connect
+    depends_on:
+      - zookeeper-1
+      - kafka-broker-1
+      - kafka-broker-2
+      - postgres
+      - schema-registry
+      - ksql-server
+    ports:
+      - 8083:8083
+    networks:
+      - kafka-cluster
+    environment:
+      BOOTSTRAP_SERVERS: "PLAINTEXT://kafka-broker-1:19092"
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+networks:
+  kafka-cluster:
+    driver: bridge
+    name: kafka-cluster

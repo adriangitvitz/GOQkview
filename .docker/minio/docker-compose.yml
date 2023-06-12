@@ -1,0 +1,52 @@
+version: '3'
+x-common: &config 
+  image: quay.io/minio/minio 
+  command: server --console-address ":9001" http://minio{1...2}/data{1...2}
+  expose: 
+    - "9000"
+    - "9001"
+  networks: 
+    - minio-cluster
+  environment: 
+    - MINIO_ROOT_USER=${MINIO_USER}
+    - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD}
+  healthcheck: 
+    test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+    interval: 30s 
+    timeout: 20s 
+    retries: 3
+services: 
+  minio1:
+    <<: *config 
+    hostname: minio1
+    volumes: 
+      - data1-1:/data1 
+      - data1-2:/data2
+  minio2: 
+    <<: *config 
+    hostname: minio2 
+    volumes: 
+      - data2-1:/data1 
+      - data2-2:/data2
+  nginx: 
+    image: nginx:1.19.2-alpine
+    hostname: nginx
+    volumes: 
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro 
+    ports: 
+      - "9000:9000"
+      - "9001:9001"
+    depends_on: 
+      - minio1 
+      - minio2
+    networks: 
+      - minio-cluster
+networks: 
+  minio-cluster: 
+    driver: bridge 
+    name: minio-cluster
+volumes: 
+  data1-1:
+  data1-2: 
+  data2-1:
+  data2-2:
