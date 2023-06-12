@@ -4,6 +4,22 @@ The project aims to develop a system that handles **qkview** files, which are up
 The system utilizes a consumer application built with Go to retrieve new messages from a Kafka topic. When a new message is received, 
 the consumer application downloads the corresponding qkview file from MinIO. It then decompresses the file and saves its contents locally, using the file name as the destination directory.
 
+### Dependencies
+
+Env variables
+```shell
+go get github.com/joho/godotenv
+```
+Kafka connection
+```shell
+go get github.com/Shopify/sarama
+```
+MinIO connection
+```shell
+go get github.com/minio/minio-go/v7
+```
+
+
 ### Configuration
 
 Kafka ( .docker/kafka ):
