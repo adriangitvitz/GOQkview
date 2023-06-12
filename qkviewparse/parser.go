@@ -3,11 +3,13 @@ package qkviewparse
 import (
 	"archive/tar"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 type QKviewparser struct {
@@ -57,6 +59,47 @@ func (q QKviewparser) extract() {
 	}
 }
 
+func (q QKviewparser) checkifexists(path string) error {
+	_, err := os.Stat(path)
+	if err == nil {
+		return nil
+	} else if err.(*os.PathError).Err == syscall.ENOTDIR {
+		// WARNING: Path is not a directory
+		return err
+	} else {
+		return err
+	}
+}
+
+func (q QKviewparser) readlogs() {
+	logpath := fmt.Sprintf("%s/var/log", q.Path)
+	err := q.checkifexists(logpath)
+	if err != nil {
+		log.Fatalf("Error searching path: %s", err.Error())
+	}
+	error := filepath.Walk(logpath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() && info.Name() == "journal" {
+			return filepath.SkipDir
+		}
+		if info.IsDir() {
+			fmt.Println(path)
+		} else {
+			if !strings.Contains(info.Name(), "audit") {
+				// TODO: Check if file is binary
+				fmt.Println(path)
+			}
+		}
+		return nil
+	})
+	if error != nil {
+		log.Fatal(error.Error())
+	}
+}
+
 func (q QKviewparser) Read() {
 	q.extract()
+	q.readlogs()
 }
