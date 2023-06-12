@@ -34,6 +34,7 @@ MinIO ( .docker/minio ):
   **MINIO_USER="miniouser"** <br>
   **MINIO_PASSWORD="miniopassword"**
 * Create a new **Event** using Kafka Destination in the MinIO web instance ( http://localhost:9000 )
-![image](https://github.com/adriangitvitz/GOQkview/assets/39295224/5ead526e-9f82-495d-90be-db37aa1eae8b)
+![Screenshot from 2023-06-12 01-12-15](https://github.com/adriangitvitz/GOQkview/assets/39295224/7724f569-7a9b-41e7-acb7-cab48fe0c702)
 * After creating the bucket subscribe to the event destination
-  ![image](https://github.com/adriangitvitz/GOQkview/assets/39295224/817ef417-12f7-4c3c-b139-e6b4cd25951a)
+![Screenshot from 2023-06-12 01-10-17](https://github.com/adriangitvitz/GOQkview/assets/39295224/3a59d430-ccad-4196-a846-db552c1033dc)
+
