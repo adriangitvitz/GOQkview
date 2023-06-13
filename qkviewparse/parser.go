@@ -121,9 +121,6 @@ func (q QKviewparser) readlogs() {
 		if info.IsDir() && info.Name() == "journal" {
 			return filepath.SkipDir
 		}
-		// if info.IsDir() {
-		// 	fmt.Println(path)
-		// }
 		if !info.IsDir() {
 			if !strings.Contains(info.Name(), "audit") {
 				if info.Size() > 0 {
