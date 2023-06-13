@@ -2,6 +2,7 @@ package qkviewparse
 
 import (
 	"archive/tar"
+	"bufio"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -71,8 +72,44 @@ func (q QKviewparser) checkifexists(path string) error {
 	}
 }
 
+// https://github.com/file/file/blob/f2a6e7cb7db9b5fd86100403df6b2f830c7f22ba/src/encoding.c#L151-L228
+func (q QKviewparser) charidentities() map[byte]bool {
+	char_array := []byte{7, 8, 9, 10, 12, 13, 27}
+	for i := 0x20; i < 0x100; i++ {
+		if i != 0x7F {
+			char_array = append(char_array, byte(i))
+		}
+	}
+	charmap := make(map[byte]bool)
+	for _, i := range char_array {
+		charmap[i] = true
+	}
+	return charmap
+}
+
+func (q QKviewparser) checkifbinary(path string) (error, bool) {
+	file, err := os.Open(path)
+	if err != nil {
+		return err, false
+	}
+	defer file.Close()
+	chars := q.charidentities()
+	reader := bufio.NewReader(file)
+	buffer := make([]byte, 1024)
+	_, err = reader.Read(buffer)
+	if err != nil {
+		return err, false
+	}
+	for _, b := range buffer {
+		if _, ok := chars[b]; !ok {
+			return nil, true
+		}
+	}
+	return nil, false
+}
+
 func (q QKviewparser) readlogs() {
-	logpath := fmt.Sprintf("%s/var/log", q.Path)
+	logpath := fmt.Sprintf("%s/var/log", strings.Split(q.Path, ".")[0])
 	err := q.checkifexists(logpath)
 	if err != nil {
 		log.Fatalf("Error searching path: %s", err.Error())
@@ -84,12 +121,20 @@ func (q QKviewparser) readlogs() {
 		if info.IsDir() && info.Name() == "journal" {
 			return filepath.SkipDir
 		}
-		if info.IsDir() {
-			fmt.Println(path)
-		} else {
+		// if info.IsDir() {
+		// 	fmt.Println(path)
+		// }
+		if !info.IsDir() {
 			if !strings.Contains(info.Name(), "audit") {
-				// TODO: Check if file is binary
-				fmt.Println(path)
+				if info.Size() > 0 {
+					err, ok := q.checkifbinary(path)
+					if err != nil {
+						log.Fatalf("Error in binary checks: %s", err.Error())
+					}
+					if !ok {
+						fmt.Println(path)
+					}
+				}
 			}
 		}
 		return nil
