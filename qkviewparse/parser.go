@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -118,7 +117,7 @@ func (q QKviewparser) readlines(path string) {
 	}
 	defer f.Close()
 	f_scanner := bufio.NewScanner(f)
-	re := regexp.MustCompile(`(\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b)|(\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\b)`)
+	re := regexp.MustCompile(`(\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}\b)|(\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\b)`)
 	ansic_layout := "Jan _2 15:04:05 2006"
 	date_layout := "2006-01-02 15:04:05"
 	for f_scanner.Scan() {
@@ -126,18 +125,18 @@ func (q QKviewparser) readlines(path string) {
 		matches := re.FindStringSubmatch(line)
 		if len(matches) > 0 {
 			if matches[1] != "" {
-                // TODO: Get year of created file instead of current year
-				d, error := time.Parse(ansic_layout, matches[1]+" "+strconv.Itoa(time.Now().Year()))
+				d, error := time.Parse(ansic_layout, matches[1])
 				if error != nil {
 					log.Fatal(error.Error())
 				}
-				log.Println("First ", d)
+				log.Println("First ", d, " Original ", matches[1])
 			} else if matches[3] != "" {
 				d, error := time.Parse(date_layout, matches[3])
 				if error != nil {
 					log.Fatal(error.Error())
 				}
-				log.Println("Second ", d)
+				// log.Println("Second ", d)
+				_ = d
 			}
 		}
 	}
