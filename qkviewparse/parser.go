@@ -126,6 +126,7 @@ func (q QKviewparser) readlines(path string) {
 		matches := re.FindStringSubmatch(line)
 		if len(matches) > 0 {
 			if matches[1] != "" {
+                // TODO: Get year of created file instead of current year
 				d, error := time.Parse(ansic_layout, matches[1]+" "+strconv.Itoa(time.Now().Year()))
 				if error != nil {
 					log.Fatal(error.Error())
