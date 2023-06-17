@@ -9,8 +9,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 type QKviewparser struct {
@@ -56,7 +59,6 @@ func (q QKviewparser) extract() {
 			log.Fatalf("Error saving: %s", err.Error())
 			return
 		}
-		log.Printf("File extracted to: %s", destinationpath)
 	}
 }
 
@@ -108,6 +110,41 @@ func (q QKviewparser) checkifbinary(path string) (error, bool) {
 	return nil, false
 }
 
+func (q QKviewparser) readlines(path string) {
+	log.Printf("Reading file: %s\n", path)
+	f, err := os.Open(path)
+	if err != nil {
+		log.Fatalf("Error reading file: %s", err.Error())
+	}
+	defer f.Close()
+	f_scanner := bufio.NewScanner(f)
+	re := regexp.MustCompile(`(\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b)|(\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\b)`)
+	ansic_layout := "Jan _2 15:04:05 2006"
+	date_layout := "2006-01-02 15:04:05"
+	for f_scanner.Scan() {
+		line := f_scanner.Text()
+		matches := re.FindStringSubmatch(line)
+		if len(matches) > 0 {
+			if matches[1] != "" {
+				d, error := time.Parse(ansic_layout, matches[1]+" "+strconv.Itoa(time.Now().Year()))
+				if error != nil {
+					log.Fatal(error.Error())
+				}
+				log.Println("First ", d)
+			} else if matches[3] != "" {
+				d, error := time.Parse(date_layout, matches[3])
+				if error != nil {
+					log.Fatal(error.Error())
+				}
+				log.Println("Second ", d)
+			}
+		}
+	}
+	if err := f_scanner.Err(); err != nil {
+		log.Fatalf("Error reading file lines: %s", err.Error())
+	}
+}
+
 func (q QKviewparser) readlogs() {
 	logpath := fmt.Sprintf("%s/var/log", strings.Split(q.Path, ".")[0])
 	err := q.checkifexists(logpath)
@@ -129,7 +166,7 @@ func (q QKviewparser) readlogs() {
 						log.Fatalf("Error in binary checks: %s", err.Error())
 					}
 					if !ok {
-						fmt.Println(path)
+						q.readlines(path)
 					}
 				}
 			}
