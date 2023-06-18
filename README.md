@@ -18,7 +18,10 @@ MinIO connection
 ```shell
 go get github.com/minio/minio-go/v7
 ```
-
+Elastic Search
+```shell
+go get github.com/elastic/go-elasticsearch/v8
+```
 
 ### Configuration
 
