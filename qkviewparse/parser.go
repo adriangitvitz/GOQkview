@@ -138,50 +138,50 @@ func (q QKviewparser) readlines(path string, es *elasticsearch.Client) {
 		log.Fatalf("Error reading file: %s", err.Error())
 	}
 	defer f.Close()
-	keywords := []string{"WARNING", "ERROR", "SEVERE", "CRITICAL", "NOTICE"}
 	f_scanner := bufio.NewScanner(f)
 	// Oct 14 13:00:00 2020 or 2023-10-24 13:00:00 or Doc 14 13:00:00
 	re := regexp.MustCompile(`(\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}\b)|(\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\b)|(\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b)`)
+	// Case sensitive status codes
+	re_status := regexp.MustCompile(`(?i)(warning|error|severe|critical|notice)`)
 	ansic_layout := "Jan _2 15:04:05 2006"
 	without_year_ansic := "Jan _2 15:04:05 2006"
 	date_layout := "2006-01-02 15:04:05"
 	for f_scanner.Scan() {
 		line := f_scanner.Text()
-		for _, k := range keywords {
-			if strings.Contains(strings.ToUpper(line), k) {
-				matches := re.FindStringSubmatch(line)
-				if len(matches) > 0 {
-					if matches[1] != "" {
-						d, error := time.Parse(ansic_layout, matches[1])
-						if error != nil {
-							log.Fatal(error.Error())
-						}
-						q.saveindex(es, ElasticIndex{
-							Path: path,
-							Line: line,
-							Date: d,
-						})
-					} else if matches[3] != "" {
-						d, error := time.Parse(date_layout, matches[3])
-						if error != nil {
-							log.Fatal(error.Error())
-						}
-						q.saveindex(es, ElasticIndex{
-							Path: path,
-							Line: line,
-							Date: d,
-						})
-					} else if matches[4] != "" {
-						d, error := time.Parse(without_year_ansic, matches[4]+" "+strconv.Itoa(time.Now().Year()))
-						if error != nil {
-							log.Fatal(error.Error())
-						}
-						q.saveindex(es, ElasticIndex{
-							Path: path,
-							Line: line,
-							Date: d,
-						})
+		match_status := re_status.FindStringSubmatch(line)
+		if len(match_status) > 0 {
+			matches := re.FindStringSubmatch(line)
+			if len(matches) > 0 {
+				if matches[1] != "" {
+					d, error := time.Parse(ansic_layout, matches[1])
+					if error != nil {
+						log.Fatal(error.Error())
 					}
+					q.saveindex(es, ElasticIndex{
+						Path: path,
+						Line: line,
+						Date: d,
+					})
+				} else if matches[3] != "" {
+					d, error := time.Parse(date_layout, matches[3])
+					if error != nil {
+						log.Fatal(error.Error())
+					}
+					q.saveindex(es, ElasticIndex{
+						Path: path,
+						Line: line,
+						Date: d,
+					})
+				} else if matches[4] != "" {
+					d, error := time.Parse(without_year_ansic, matches[4]+" "+strconv.Itoa(time.Now().Year()))
+					if error != nil {
+						log.Fatal(error.Error())
+					}
+					q.saveindex(es, ElasticIndex{
+						Path: path,
+						Line: line,
+						Date: d,
+					})
 				}
 			}
 		}
