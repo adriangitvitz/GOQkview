@@ -27,9 +27,10 @@ type QKviewparser struct {
 }
 
 type ElasticIndex struct {
-	Path string
-	Line string
-	Date time.Time
+	Path   string
+	Line   string
+	Status string
+	Date   time.Time
 }
 
 func (q QKviewparser) extract() {
@@ -158,9 +159,10 @@ func (q QKviewparser) readlines(path string, es *elasticsearch.Client) {
 						log.Fatal(error.Error())
 					}
 					q.saveindex(es, ElasticIndex{
-						Path: path,
-						Line: line,
-						Date: d,
+						Path:   path,
+						Line:   line,
+						Date:   d,
+						Status: strings.ToUpper(match_status[0]),
 					})
 				} else if matches[3] != "" {
 					d, error := time.Parse(date_layout, matches[3])
@@ -168,9 +170,10 @@ func (q QKviewparser) readlines(path string, es *elasticsearch.Client) {
 						log.Fatal(error.Error())
 					}
 					q.saveindex(es, ElasticIndex{
-						Path: path,
-						Line: line,
-						Date: d,
+						Path:   path,
+						Line:   line,
+						Date:   d,
+						Status: strings.ToUpper(match_status[0]),
 					})
 				} else if matches[4] != "" {
 					d, error := time.Parse(without_year_ansic, matches[4]+" "+strconv.Itoa(time.Now().Year()))
@@ -178,9 +181,10 @@ func (q QKviewparser) readlines(path string, es *elasticsearch.Client) {
 						log.Fatal(error.Error())
 					}
 					q.saveindex(es, ElasticIndex{
-						Path: path,
-						Line: line,
-						Date: d,
+						Path:   path,
+						Line:   line,
+						Date:   d,
+						Status: strings.ToUpper(match_status[0]),
 					})
 				}
 			}
