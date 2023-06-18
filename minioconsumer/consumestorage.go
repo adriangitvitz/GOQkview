@@ -11,12 +11,12 @@ import (
 )
 
 type Consumer struct {
-	Bootstrap    string
-	Mechanism    string
-	User         string
-	Password     string
-	Topic        string
-	Elastic      elasticsearch.Config
+	Bootstrap string
+	Mechanism string
+	User      string
+	Password  string
+	Topic     string
+	Elastic   elasticsearch.Config
 }
 
 // https://github.com/file/file/blob/f2a6e7cb7db9b5fd86100403df6b2f830c7f22ba/src/encoding.c#L151-L228
@@ -54,7 +54,7 @@ func (c Consumer) Consume(s *storage.Storage) {
 	defer partitiionconsumer.Close()
 	chars := c.charidentities()
 	es, err := elasticsearch.NewClient(c.Elastic)
-    log.Println("Connecting to Elastic")
+	log.Println("Connecting to Elastic")
 	if err != nil {
 		log.Fatalf("Error connecting to elastic: %s", err.Error())
 	}
