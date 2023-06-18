@@ -22,6 +22,10 @@ Elastic Search
 ```shell
 go get github.com/elastic/go-elasticsearch/v8
 ```
+UUID
+```shell
+go get github.com/google/uuid
+```
 
 ### Configuration
 
