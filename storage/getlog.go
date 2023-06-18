@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"minioconsumer/qkviewparse"
-	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/minio/minio-go/v7"
@@ -17,7 +16,7 @@ type Storage struct {
 	Secretkey string `default:""`
 }
 
-func (s Storage) Getlog(bucket string, miniopath string, chars map[byte]bool, es *elasticsearch.Client) {
+func (s Storage) Getlog(bucket string, miniopath string, fname string, chars map[byte]bool, es *elasticsearch.Client) {
 	// NOTE: Uncomment to use defaults
 	// utils.Setdefault(&s, "default")
 	minioclient, err := minio.New(s.Endpoint, &minio.Options{
@@ -26,12 +25,6 @@ func (s Storage) Getlog(bucket string, miniopath string, chars map[byte]bool, es
 	})
 	if err != nil {
 		log.Fatalf("Minio error: %s", err.Error())
-	}
-
-	fnameparts := strings.Split(miniopath, "/")
-	fname := fnameparts[0]
-	if len(fnameparts) > 1 {
-		fname = fnameparts[len(fnameparts)-1]
 	}
 
 	err = minioclient.FGetObject(context.Background(), bucket, miniopath, fname, minio.GetObjectOptions{})

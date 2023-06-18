@@ -5,6 +5,8 @@ import (
 	"log"
 	"minioconsumer/models"
 	"minioconsumer/storage"
+	"os"
+	"strings"
 
 	"github.com/Shopify/sarama"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -66,7 +68,21 @@ func (c Consumer) Consume(s *storage.Storage) {
 		}
 		for _, v := range mresponse.Records {
 			log.Printf("Getting file: %s", v.Bucketinfo.Object.Key)
-			s.Getlog(v.Bucketinfo.Bucket.Name, v.Bucketinfo.Object.Key, chars, es)
+			fnameparts := strings.Split(v.Bucketinfo.Object.Key, "/")
+			fname := fnameparts[0]
+			if len(fnameparts) > 1 {
+				fname = fnameparts[len(fnameparts)-1]
+			}
+			dirname := strings.Split(fname, ".")[0]
+			s.Getlog(v.Bucketinfo.Bucket.Name, v.Bucketinfo.Object.Key, fname, chars, es)
+			err := os.Remove(fname)
+			if err != nil {
+				log.Fatalf("Error removing file: %s", err.Error())
+			}
+			err = os.RemoveAll(dirname)
+			if err != nil {
+				log.Fatalf("Error removing file: %s", err.Error())
+			}
 		}
 	}
 }
