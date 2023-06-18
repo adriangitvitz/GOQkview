@@ -7,14 +7,31 @@ import (
 	"minioconsumer/storage"
 
 	"github.com/Shopify/sarama"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 type Consumer struct {
-	Bootstrap string
-	Mechanism string
-	User      string
-	Password  string
-	Topic     string
+	Bootstrap    string
+	Mechanism    string
+	User         string
+	Password     string
+	Topic        string
+	Elastic      elasticsearch.Config
+}
+
+// https://github.com/file/file/blob/f2a6e7cb7db9b5fd86100403df6b2f830c7f22ba/src/encoding.c#L151-L228
+func (c Consumer) charidentities() map[byte]bool {
+	char_array := []byte{7, 8, 9, 10, 12, 13, 27}
+	for i := 0x20; i < 0x100; i++ {
+		if i != 0x7F {
+			char_array = append(char_array, byte(i))
+		}
+	}
+	charmap := make(map[byte]bool)
+	for _, i := range char_array {
+		charmap[i] = true
+	}
+	return charmap
 }
 
 func (c Consumer) Consume(s *storage.Storage) {
@@ -35,6 +52,12 @@ func (c Consumer) Consume(s *storage.Storage) {
 		log.Fatalf("%s", err.Error())
 	}
 	defer partitiionconsumer.Close()
+	chars := c.charidentities()
+	es, err := elasticsearch.NewClient(c.Elastic)
+    log.Println("Connecting to Elastic")
+	if err != nil {
+		log.Fatalf("Error connecting to elastic: %s", err.Error())
+	}
 	for msg := range partitiionconsumer.Messages() {
 		mresponse := models.Minioresponse{}
 		err := json.Unmarshal(msg.Value, &mresponse)
@@ -43,7 +66,7 @@ func (c Consumer) Consume(s *storage.Storage) {
 		}
 		for _, v := range mresponse.Records {
 			log.Printf("Getting file: %s", v.Bucketinfo.Object.Key)
-			s.Getlog(v.Bucketinfo.Bucket.Name, v.Bucketinfo.Object.Key)
+			s.Getlog(v.Bucketinfo.Bucket.Name, v.Bucketinfo.Object.Key, chars, es)
 		}
 	}
 }

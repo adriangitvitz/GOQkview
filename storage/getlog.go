@@ -6,6 +6,7 @@ import (
 	"minioconsumer/qkviewparse"
 	"strings"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -16,7 +17,7 @@ type Storage struct {
 	Secretkey string `default:""`
 }
 
-func (s Storage) Getlog(bucket string, miniopath string) {
+func (s Storage) Getlog(bucket string, miniopath string, chars map[byte]bool, es *elasticsearch.Client) {
 	// NOTE: Uncomment to use defaults
 	// utils.Setdefault(&s, "default")
 	minioclient, err := minio.New(s.Endpoint, &minio.Options{
@@ -41,5 +42,5 @@ func (s Storage) Getlog(bucket string, miniopath string) {
 	q := qkviewparse.QKviewparser{
 		Path: fname,
 	}
-	q.Read()
+	q.Read(chars, es)
 }

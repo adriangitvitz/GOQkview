@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"bufio"
 	"compress/gzip"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -14,10 +16,20 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/google/uuid"
 )
 
 type QKviewparser struct {
 	Path string
+}
+
+type ElasticIndex struct {
+	Path string
+	Line string
+	Date time.Time
 }
 
 func (q QKviewparser) extract() {
@@ -74,28 +86,12 @@ func (q QKviewparser) checkifexists(path string) error {
 	}
 }
 
-// https://github.com/file/file/blob/f2a6e7cb7db9b5fd86100403df6b2f830c7f22ba/src/encoding.c#L151-L228
-func (q QKviewparser) charidentities() map[byte]bool {
-	char_array := []byte{7, 8, 9, 10, 12, 13, 27}
-	for i := 0x20; i < 0x100; i++ {
-		if i != 0x7F {
-			char_array = append(char_array, byte(i))
-		}
-	}
-	charmap := make(map[byte]bool)
-	for _, i := range char_array {
-		charmap[i] = true
-	}
-	return charmap
-}
-
-func (q QKviewparser) checkifbinary(path string) (error, bool) {
+func (q QKviewparser) checkifbinary(path string, chars map[byte]bool) (error, bool) {
 	file, err := os.Open(path)
 	if err != nil {
 		return err, false
 	}
 	defer file.Close()
-	chars := q.charidentities()
 	reader := bufio.NewReader(file)
 	buffer := make([]byte, 1024)
 	_, err = reader.Read(buffer)
@@ -110,8 +106,33 @@ func (q QKviewparser) checkifbinary(path string) (error, bool) {
 	return nil, false
 }
 
-func (q QKviewparser) readlines(path string) {
-	log.Printf("Reading file: %s\n", path)
+func (q QKviewparser) saveindex(es *elasticsearch.Client, index ElasticIndex) {
+	index_str, err := json.Marshal(index)
+	if err != nil {
+		log.Fatalf("Error parsing index: %s", err.Error())
+	}
+	docid := uuid.New().String()
+	if docid == "" {
+		log.Fatalf("Error processing uuid")
+	}
+	req := esapi.IndexRequest{
+		Index:      os.Getenv("ELASTIC_INDEX"),
+		DocumentID: docid,
+		Body:       strings.NewReader(string(index_str)),
+		Refresh:    "true",
+	}
+	res, err := req.Do(context.Background(), es)
+	if err != nil {
+		log.Fatalf("Error sending index: %s", err.Error())
+	}
+	defer res.Body.Close()
+	if res.IsError() {
+		log.Fatalf("Error sending index: %s", res.Status())
+	}
+}
+
+func (q QKviewparser) readlines(path string, es *elasticsearch.Client) {
+	log.Printf("Processing file: %s\n", path)
 	f, err := os.Open(path)
 	if err != nil {
 		log.Fatalf("Error reading file: %s", err.Error())
@@ -119,7 +140,7 @@ func (q QKviewparser) readlines(path string) {
 	defer f.Close()
 	keywords := []string{"WARNING", "ERROR", "SEVERE", "CRITICAL", "NOTICE"}
 	f_scanner := bufio.NewScanner(f)
-	// Oct 14 13:00:00 2020 or 2023-10-24 13:00:00
+	// Oct 14 13:00:00 2020 or 2023-10-24 13:00:00 or Doc 14 13:00:00
 	re := regexp.MustCompile(`(\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}\b)|(\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\b)|(\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b)`)
 	ansic_layout := "Jan _2 15:04:05 2006"
 	without_year_ansic := "Jan _2 15:04:05 2006"
@@ -135,21 +156,31 @@ func (q QKviewparser) readlines(path string) {
 						if error != nil {
 							log.Fatal(error.Error())
 						}
-						_ = d
-						// log.Println("First ", d, " Original ", matches[1])
+						q.saveindex(es, ElasticIndex{
+							Path: path,
+							Line: line,
+							Date: d,
+						})
 					} else if matches[3] != "" {
 						d, error := time.Parse(date_layout, matches[3])
 						if error != nil {
 							log.Fatal(error.Error())
 						}
-						// log.Println("Second ", d, " Original ", matches[1])
-						_ = d
+						q.saveindex(es, ElasticIndex{
+							Path: path,
+							Line: line,
+							Date: d,
+						})
 					} else if matches[4] != "" {
 						d, error := time.Parse(without_year_ansic, matches[4]+" "+strconv.Itoa(time.Now().Year()))
 						if error != nil {
 							log.Fatal(error.Error())
 						}
-						log.Println("Original ", matches[4], " Line ", line, d)
+						q.saveindex(es, ElasticIndex{
+							Path: path,
+							Line: line,
+							Date: d,
+						})
 					}
 				}
 			}
@@ -160,7 +191,7 @@ func (q QKviewparser) readlines(path string) {
 	}
 }
 
-func (q QKviewparser) readlogs() {
+func (q QKviewparser) readlogs(chars map[byte]bool, es *elasticsearch.Client) {
 	logpath := fmt.Sprintf("%s/var/log", strings.Split(q.Path, ".")[0])
 	err := q.checkifexists(logpath)
 	if err != nil {
@@ -176,12 +207,12 @@ func (q QKviewparser) readlogs() {
 		if !info.IsDir() {
 			if !strings.Contains(info.Name(), "audit") {
 				if info.Size() > 0 {
-					err, ok := q.checkifbinary(path)
+					err, ok := q.checkifbinary(path, chars)
 					if err != nil {
 						log.Fatalf("Error in binary checks: %s", err.Error())
 					}
 					if !ok {
-						q.readlines(path)
+						q.readlines(path, es)
 					}
 				}
 			}
@@ -193,7 +224,7 @@ func (q QKviewparser) readlogs() {
 	}
 }
 
-func (q QKviewparser) Read() {
+func (q QKviewparser) Read(chars map[byte]bool, es *elasticsearch.Client) {
 	q.extract()
-	q.readlogs()
+	q.readlogs(chars, es)
 }
