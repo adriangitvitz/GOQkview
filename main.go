@@ -2,6 +2,7 @@ package main
 
 import (
 	"minioconsumer/minioconsumer"
+	"minioconsumer/repositories"
 	"minioconsumer/storage"
 	"os"
 
@@ -30,5 +31,6 @@ func main() {
 		Accesskey: os.Getenv("ACCESSKEY"),
 		Secretkey: os.Getenv("SECRETKEY"),
 	}
+    repositories.Connectpostgres()
 	m.Consume(&s)
 }

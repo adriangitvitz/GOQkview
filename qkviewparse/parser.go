@@ -23,7 +23,7 @@ import (
 )
 
 type QKviewparser struct {
-	Path string
+	Path   string
 }
 
 type ElasticIndex struct {

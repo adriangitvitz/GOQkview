@@ -2,14 +2,17 @@ package minioconsumer
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"minioconsumer/models"
+	"minioconsumer/repositories"
 	"minioconsumer/storage"
 	"os"
 	"strings"
 
 	"github.com/Shopify/sarama"
 	"github.com/elastic/go-elasticsearch/v8"
+	"gorm.io/gorm"
 )
 
 type Consumer struct {
@@ -56,10 +59,13 @@ func (c Consumer) Consume(s *storage.Storage) {
 	defer partitiionconsumer.Close()
 	chars := c.charidentities()
 	es, err := elasticsearch.NewClient(c.Elastic)
+	_ = chars
+	_ = es
 	log.Println("Connecting to Elastic")
 	if err != nil {
 		log.Fatalf("Error connecting to elastic: %s", err.Error())
 	}
+	log.Println("Waiting for messages...")
 	for msg := range partitiionconsumer.Messages() {
 		mresponse := models.Minioresponse{}
 		err := json.Unmarshal(msg.Value, &mresponse)
@@ -74,7 +80,13 @@ func (c Consumer) Consume(s *storage.Storage) {
 				fname = fnameparts[len(fnameparts)-1]
 			}
 			dirname := strings.Split(fname, ".")[0]
-			s.Getlog(v.Bucketinfo.Bucket.Name, v.Bucketinfo.Object.Key, fname, chars, es)
+			_ = dirname
+			var upload models.Upload
+			res := repositories.POSTGRES.Where(&models.Upload{Tag: v.Bucketinfo.Object.Metadata.Metauuid, Type: "logs", Processed: false}).First(&upload)
+			if !errors.Is(res.Error, gorm.ErrRecordNotFound) {
+				s.Getlog(upload.Bucket, v.Bucketinfo.Object.Key, fname, chars, es)
+                repositories.POSTGRES.Where(&models.Upload{Tag: v.Bucketinfo.Object.Metadata.Metauuid}).Updates(&models.Upload{Processed: true})
+			}
 			err := os.Remove(fname)
 			if err != nil {
 				log.Fatalf("Error removing file: %s", err.Error())

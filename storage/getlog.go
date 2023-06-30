@@ -19,6 +19,8 @@ type Storage struct {
 func (s Storage) Getlog(bucket string, miniopath string, fname string, chars map[byte]bool, es *elasticsearch.Client) {
 	// NOTE: Uncomment to use defaults
 	// utils.Setdefault(&s, "default")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	minioclient, err := minio.New(s.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(s.Accesskey, s.Secretkey, ""),
 		Secure: false,
@@ -27,7 +29,7 @@ func (s Storage) Getlog(bucket string, miniopath string, fname string, chars map
 		log.Fatalf("Minio error: %s", err.Error())
 	}
 
-	err = minioclient.FGetObject(context.Background(), bucket, miniopath, fname, minio.GetObjectOptions{})
+	err = minioclient.FGetObject(ctx, bucket, miniopath, fname, minio.GetObjectOptions{})
 	if err != nil {
 		log.Fatalf("Minio object: %s", err.Error())
 	}

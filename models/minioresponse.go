@@ -18,5 +18,10 @@ type Bucket struct {
 }
 
 type Object struct {
-	Key string `json:"key"`
+	Key      string   `json:"key"`
+	Metadata Metadata `json:"userMetadata"`
+}
+
+type Metadata struct {
+	Metauuid string `json:"X-Amz-Meta-Uuid"`
 }
