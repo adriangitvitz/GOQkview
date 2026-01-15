@@ -13,7 +13,6 @@ type Upload struct {
 	Type       string    `gorm:"column:type"`
 }
 
-// Set table name
-func (Upload) Tablename() string {
+func (Upload) TableName() string {
 	return "uploads"
 }
